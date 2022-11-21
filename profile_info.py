@@ -1,4 +1,3 @@
-from typing import Union
 import re
 import json
 import requests
@@ -7,12 +6,15 @@ import csv
 import os
 import logging
 from fake_headers import Headers
+from seleniumwire import webdriver
+from selenium.webdriver.edge.options import Options as CustomEdgeOptions
 from selenium.webdriver.chrome.options import Options as CustomChromeOptions
 from selenium.webdriver.chrome.service import Service as ChromeService
+from selenium.webdriver.edge.service import Service as EdgeService
 from selenium.webdriver.firefox.options import Options as CustomFireFoxOptions
 from selenium.webdriver.firefox.service import Service as FirefoxService
-from seleniumwire import webdriver
 from webdriver_manager.chrome import ChromeDriverManager
+from webdriver_manager.microsoft import EdgeChromiumDriverManager
 from webdriver_manager.firefox import GeckoDriverManager
 from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -20,10 +22,9 @@ from selenium.webdriver.common.by import By
 from selenium.common.exceptions import WebDriverException, NoSuchElementException
 from selenium.webdriver.common.keys import Keys
 from random import randint
-from selenium.common.exceptions import NoSuchElementException
 from dateutil.parser import parse
-from selenium.webdriver.common.by import By
 from urllib.parse import quote
+from typing import Union
 
 
 
@@ -56,6 +57,12 @@ class Initializer:
             # runs browser in headless mode
             browser_option.add_argument("--headless")
         if self.profile and self.browser_name.lower() == "chrome":
+            browser_option.add_argument(
+                "user-data-dir={}".format(self.profile))
+        if self.profile and self.browser_name.lower() == "edge":
+            logger.setLevel(logging.INFO)
+            logger.info("Using Proxy: {}".format(self.proxy))
+            browser_option.add_argument("-profile")
             browser_option.add_argument(
                 "user-data-dir={}".format(self.profile))
         if self.profile and self.browser_name.lower() == "firefox":
@@ -107,6 +114,19 @@ class Initializer:
 
             # automatically installs geckodriver and initialize it and returns the instance
             return webdriver.Firefox(service=FirefoxService(executable_path=GeckoDriverManager().install()), options=self.set_properties(browser_option))
+        elif browser_name.lower() == "edge":
+            browser_option = CustomEdgeOptions()
+            if self.proxy is not None:
+                options = {
+                    'https': 'https://{}'.format(self.proxy.replace(" ", "")),
+                    'http': 'http://{}'.format(self.proxy.replace(" ", "")),
+                    'no_proxy': 'localhost, 127.0.0.1'
+                }
+                logger.setLevel(logging.INFO)
+                logger.info("Using Proxy: {}".format(self.proxy))
+                return webdriver.Edge(service=EdgeService(executable_path=EdgeChromiumDriverManager().install()), options=self.set_properties(browser_option), seleniumwire_options=options)
+                # automatically installs msedgedriver and initialize it and returns the instance
+            return webdriver.Edge(service=EdgeService(executable_path=EdgeChromiumDriverManager().install()), options=self.set_properties(browser_option))
         else:
             # if browser_name is not chrome neither firefox than raise an exception
             raise Exception("Browser not supported!")
@@ -602,7 +622,7 @@ class Finder:
         logger.warning('Error at find_graphql_link : {}'.format(ex))
 
 class Profile:
-    """this class needs to be instantiated in orer to scrape post of some
+    """this class needs to be instantiated in order to scrape post of some
     twitter profile"""
 
     def __init__(self, twitter_username, browser, proxy, tweets_count, headless, browser_profile):
@@ -613,7 +633,7 @@ class Profile:
         self.proxy = proxy
         self.tweets_count = tweets_count
         self.posts_data = {}
-        self.retry = 10
+        self.retry = 20
         self.headless = headless
         self.browser_profile = browser_profile
 
@@ -757,7 +777,7 @@ def json_to_csv(filename, json_data, directory):
 
 
 def scrape_profile(twitter_username: str, browser: str = "firefox", proxy: Union[str, None] = None,
-                  tweets_count: int = 10, output_format: str = "json", filename: str = "", directory: str = os.getcwd(),
+                  tweets_count: int = 30, output_format: str = "json", filename: str = "", directory: str = os.getcwd(),
                   headless: bool = True, browser_profile: Union[str, None] = None):
     """Scrap tweets of twitter profile using twitter username.
 
@@ -802,13 +822,14 @@ def scrape_profile(twitter_username: str, browser: str = "firefox", proxy: Union
                         logger.warning('Invalid JSON Detected!')
                         content = {}
                     file.close()
-                    data.update(content) # type: ignore
+                    data.update(content)  # type: ignore
                     with open(json_file_location, 'w', encoding='utf-8') as file_in_write_mode:
                         json.dump(data, file_in_write_mode)
+                    with open(filename+".json", "w", encoding='utf-8') as outfile:
+                        outfile.write(data)  # type: ignore
                 logger.setLevel(logging.INFO)
                 logger.info(
-                    'Data Successfully Saved to {}'.format(json_file_location))
-                
+                    'Data Successfully Saved to {}'.format(json_file_location))     
     elif output_format.lower() == "csv":
         if filename == "":
             filename = twitter_username

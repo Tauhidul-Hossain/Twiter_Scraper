@@ -825,8 +825,6 @@ def scrape_profile(twitter_username: str, browser: str = "firefox", proxy: Union
                     data.update(content)  # type: ignore
                     with open(json_file_location, 'w', encoding='utf-8') as file_in_write_mode:
                         json.dump(data, file_in_write_mode)
-                    with open(filename+".json", "w", encoding='utf-8') as outfile:
-                        outfile.write(data)  # type: ignore
                 logger.setLevel(logging.INFO)
                 logger.info(
                     'Data Successfully Saved to {}'.format(json_file_location))     
